@@ -5,55 +5,83 @@ import math
 pygame.init()
 
 # Константы
-WIDTH, HEIGHT = 800, 600
-PADDLE_WIDTH, PADDLE_HEIGHT = 20, 100
-BALL_SIZE = 15
+WIDTH, HEIGHT = 1400, 700
+PADDLE_WIDTH, PADDLE_HEIGHT = 15, 140
+BALL_SIZE = 20
 MAX_PRESS_DURATION = 3000 # Время набора максимальной силы удара, мс
 FPS = 60
 
 # Цвета
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
+BLACK = (0,   0,   0)
+RED =   (255, 0,   0)
+GREEN = (0,   255, 0)
+BLUE =  (0,   0,   255)
 
 # Создание окна
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Pong")
+pygame.display.set_caption("Пинг-понг")
+
+pygame.display.set_icon(pygame.image.load('ball.png')) # Установка иконки окна
+
+background = pygame.transform.scale(pygame.image.load("Table.png"), (WIDTH, HEIGHT)) # задай фон сцены
 
 # Шрифты
-font = pygame.font.Font(None, 74)
-small_font = pygame.font.Font(None, 50)
+font = pygame.font.SysFont('Arial', 74)
+small_font = pygame.font.SysFont('Arial', 50)
 
-class Paddle:
-    def __init__(self, x, y):
-        self.rect = pygame.Rect(x, y, PADDLE_WIDTH, PADDLE_HEIGHT)
-        self.speed = 5
+class GameSprite(pygame.sprite.Sprite):
+    def __init__(self, fileImage=None, speed=0, x=0, y=0, w=0, h=0, colores=(0, 0, 0)):
+        super().__init__()
 
-    def move(self, dy):
-        self.rect.y += dy
-        self.rect.y = max(0, min(self.rect.y, HEIGHT - PADDLE_HEIGHT))
+        self.w = w
+        self.h = h
+        self.colores = colores
 
-class Ball:
-    def __init__(self):
-        self.rect = pygame.Rect(0, 0, BALL_SIZE, BALL_SIZE)
+        if fileImage is None:
+            self.image = pygame.Surface((self.w, self.h))
+            self.image.fill(self.colores)
+        else:
+            self.image = pygame.transform.scale(pygame.image.load(fileImage), (self.w, self.h))
+
+        self.speed = speed
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+    def reset(self):
+        screen.blit(self.image, (self.rect.x, self.rect.y))
+
+class Player(GameSprite):
+    def __init__(self, fileImage, x, colores, btnUp, btnDown):
+        super().__init__(fileImage, speed=10, x=x, y=(HEIGHT-PADDLE_HEIGHT)//2, w=PADDLE_WIDTH, h=PADDLE_HEIGHT, colores=colores)
+
+        self.btnUp = btnUp
+        self.btnDown = btnDown
+
+    def update(self):
+        keys_pressed = pygame.key.get_pressed()
+        if keys_pressed[self.btnUp] and self.rect.top > 0: self.rect.y -= self.speed
+        if keys_pressed[self.btnDown] and self.rect.bottom < HEIGHT:  self.rect.y += self.speed
+
+class Ball(GameSprite):
+    def __init__(self, fileImage=None, speedX=0, speedY=0, colores=WHITE):
+        super().__init__(fileImage, w=BALL_SIZE, h=BALL_SIZE)
         self.is_ready_to_launch = True
         self.launch_side = "left"
         self.dx = 0
         self.dy = 0
         self.offset_y = 0  # Новый атрибут для смещения по Y
         
-    def reset(self, side):
+    def restart(self, side):
         self.is_ready_to_launch = True
         self.launch_side = side
         self.offset_y = 0  # Сбрасываем смещение
         
         if side == "left":
-            self.rect.center = (paddle_left.rect.centerx + PADDLE_WIDTH//2 + BALL_SIZE//2, 
-                               paddle_left.rect.centery)
+            self.rect.center = (paddle_left.rect.right + BALL_SIZE//2, paddle_left.rect.centery)
         else:
-            self.rect.center = (paddle_right.rect.centerx - PADDLE_WIDTH//2 - BALL_SIZE//2,
-                               paddle_right.rect.centery)
+            self.rect.center = (paddle_right.rect.left - BALL_SIZE//2, paddle_right.rect.centery)
 
     def move(self):
         if not self.is_ready_to_launch:
@@ -69,7 +97,10 @@ def check_collision(ball, paddle):
         hit_position = max(-1, min(hit_position, 1))
         
         angle = hit_position * math.radians(75)
-        direction = 1 if paddle.rect.left < WIDTH//2 else -1
+        if paddle.rect.left < WIDTH//2:
+            direction = 1
+        else:
+            direction = -1
         
         speed = math.hypot(ball.dx, ball.dy) * 1.02
         ball.dx = direction * speed * math.cos(angle)
@@ -77,19 +108,31 @@ def check_collision(ball, paddle):
         
         if direction > 0:
             ball.rect.left = paddle.rect.right
+            shoot_right.play()
         else:
             ball.rect.right = paddle.rect.left
+            shoot_left.play()
 
 # Инициализация объектов
-paddle_left = Paddle(20, HEIGHT//2 - PADDLE_HEIGHT//2)
-paddle_right = Paddle(WIDTH - 40, HEIGHT//2 - PADDLE_HEIGHT//2)
-ball = Ball()
-ball.reset("left")
+paddle_left = Player(None, 10, RED, pygame.K_w, pygame.K_s ) #Левый игрок
+paddle_right = Player(None, WIDTH-PADDLE_WIDTH-10, BLUE, pygame.K_UP, pygame.K_DOWN) #Правый игрок
+ball = Ball('ball.png')
+ball.restart("left")
 
 # Счет
 score_left = 0
 score_right = 0
 game_over = False
+
+# Звуки
+pygame.mixer.init()
+# pygame.mixer.music.load('space.ogg')
+# pygame.mixer.music.set_volume(0.5)
+# pygame.mixer.music.play(-1)
+shoot_left = pygame.mixer.Sound('udar_left.ogg')
+#shoot_left.set_volume(0.5)
+shoot_right = pygame.mixer.Sound('udar_right.ogg')
+#shoot_right.set_volume(0.5)
 
 clock = pygame.time.Clock()
 space_pressed_time = 0
@@ -99,12 +142,13 @@ def reset_game():
     score_left = 0
     score_right = 0
     game_over = False
-    ball.reset("left")
+    ball.restart("left")
 
 running = True
 while running:
     # Очистка экрана
-    screen.fill(BLACK)
+    #screen.fill(BLACK)
+    screen.blit(background, (0, 0))
     
     # Обработка событий
     for event in pygame.event.get():
@@ -141,21 +185,12 @@ while running:
                 ball.dy = speed * math.sin(angle)
                 ball.is_ready_to_launch = False
 
-    # Управление ракетками
     keys = pygame.key.get_pressed()
+    # Управление ракетками
     if not game_over:
-        # Левая ракетка
-        if keys[pygame.K_w]:
-            paddle_left.move(-paddle_left.speed)
-        if keys[pygame.K_s]:
-            paddle_left.move(paddle_left.speed)
+        paddle_left.update()
+        paddle_right.update()
         
-        # Правая ракетка
-        if keys[pygame.K_UP]:
-            paddle_right.move(-paddle_right.speed)
-        if keys[pygame.K_DOWN]:
-            paddle_right.move(paddle_right.speed)
-
     # Управление позицией мяча на ракетке
     if ball.is_ready_to_launch and not game_over:
         move_step = 3
@@ -196,19 +231,19 @@ while running:
             if score_right >= 11:
                 game_over = True
             else:
-                ball.reset("right")
+                ball.restart("right")
         elif ball.rect.left > WIDTH:
             score_left += 1
             if score_left >= 11:
                 game_over = True
             else:
-                ball.reset("left")
+                ball.restart("left")
 
     # Отрисовка игровых объектов
-    pygame.draw.rect(screen, WHITE, paddle_left.rect)
-    pygame.draw.rect(screen, WHITE, paddle_right.rect)
-    pygame.draw.ellipse(screen, WHITE, ball.rect)
-    pygame.draw.aaline(screen, WHITE, (WIDTH//2, 0), (WIDTH//2, HEIGHT))
+    paddle_left.reset()
+    paddle_right.reset()
+    ball.reset()
+    #pygame.draw.aaline(screen, WHITE, (WIDTH//2, 0), (WIDTH//2, HEIGHT))
 
     # Отрисовка счета
     score_text = font.render(f"{score_left} : {score_right}", True, WHITE)
@@ -216,14 +251,14 @@ while running:
 
     # Индикатор силы удара
     if ball.is_ready_to_launch and not game_over:
-        power = min((pygame.time.get_ticks() - space_pressed_time) / 1000, 1.0)
+        power = min((pygame.time.get_ticks() - space_pressed_time) / MAX_PRESS_DURATION, 1.0)
         pygame.draw.rect(screen, GREEN, (WIDTH//2 - 50, HEIGHT-20, 100 * power, 10))
 
     # Экран победы
     if game_over:
-        winner_text = font.render("PLAYER LEFT WINS!" if score_left >= 11 else "PLAYER RIGHT WINS!", True, RED)
+        winner_text = font.render("Выиграл левый игрок!" if score_left >= 11 else "Выиграл правый игрок!", True, RED)
         screen.blit(winner_text, (WIDTH//2 - winner_text.get_width()//2, HEIGHT//2 - 50))
-        restart_text = small_font.render("Press ENTER to restart", True, WHITE)
+        restart_text = small_font.render("Нажмите ENTER для перезапуска", True, WHITE)
         screen.blit(restart_text, (WIDTH//2 - restart_text.get_width()//2, HEIGHT//2 + 50))
 
     # Обновление экрана
