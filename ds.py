@@ -1,5 +1,9 @@
+import os
 import pygame
 import math
+
+# Указываем положение окна в координатах экрана
+os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (50, 50)
 
 # Инициализация Pygame
 pygame.init()
@@ -9,6 +13,7 @@ WIDTH, HEIGHT = 1400, 700
 PADDLE_WIDTH, PADDLE_HEIGHT = 15, 140
 BALL_SIZE = 20
 MAX_PRESS_DURATION = 3000 # Время набора максимальной силы удара, мс
+MAX_ANGLE_OF_DEVIATION = 60 #Максимальный угол отбивания мяча от ракетки
 FPS = 60
 
 # Цвета
@@ -88,15 +93,18 @@ class Ball(GameSprite):
             self.rect.x += self.dx
             self.rect.y += self.dy
 
+            #удар мяча об стену (верхнюю или нижнюю)
             if self.rect.top <= 0 or self.rect.bottom >= HEIGHT:
+                hitting_the_wall.play()
                 self.dy *= -1
 
 def check_collision(ball, paddle):
     if not ball.is_ready_to_launch and ball.rect.colliderect(paddle.rect):
+        hitting_the_racket.play()
         hit_position = (ball.rect.centery - paddle.rect.centery) / (PADDLE_HEIGHT / 2)
         hit_position = max(-1, min(hit_position, 1))
         
-        angle = hit_position * math.radians(75)
+        angle = hit_position * math.radians(MAX_ANGLE_OF_DEVIATION)
         if paddle.rect.left < WIDTH//2:
             direction = 1
         else:
@@ -108,10 +116,8 @@ def check_collision(ball, paddle):
         
         if direction > 0:
             ball.rect.left = paddle.rect.right
-            shoot_right.play()
         else:
             ball.rect.right = paddle.rect.left
-            shoot_left.play()
 
 # Инициализация объектов
 paddle_left = Player(None, 10, RED, pygame.K_w, pygame.K_s ) #Левый игрок
@@ -129,10 +135,11 @@ pygame.mixer.init()
 # pygame.mixer.music.load('space.ogg')
 # pygame.mixer.music.set_volume(0.5)
 # pygame.mixer.music.play(-1)
-shoot_left = pygame.mixer.Sound('udar_left.ogg')
-#shoot_left.set_volume(0.5)
-shoot_right = pygame.mixer.Sound('udar_right.ogg')
-#shoot_right.set_volume(0.5)
+hitting_the_racket = pygame.mixer.Sound('hitting_the_racket.OGG') #удар мяча об ракетку
+hitting_the_wall = pygame.mixer.Sound('hitting_the_wall.OGG') #удар мяча об стену
+ball_drop = pygame.mixer.Sound('ball_drop.OGG') #падение мяча (гол)
+falling_rackets = pygame.mixer.Sound('falling_rackets.OGG') #бросок ракеток на стол (проигрыш)
+
 
 clock = pygame.time.Clock()
 space_pressed_time = 0
@@ -147,7 +154,6 @@ def reset_game():
 running = True
 while running:
     # Очистка экрана
-    #screen.fill(BLACK)
     screen.blit(background, (0, 0))
     
     # Обработка событий
@@ -205,7 +211,7 @@ while running:
             if keys[pygame.K_RIGHT]:
                 ball.offset_y = min(PADDLE_HEIGHT//2 - BALL_SIZE, ball.offset_y + move_step)
 
-    # Обновление позиции мяча при подготовке
+    # Обновление позиции мяча при подготовке (приклеивание мяча к ракетке)
     if ball.is_ready_to_launch and not game_over:
         if ball.launch_side == "left":
             paddle = paddle_left
@@ -227,15 +233,19 @@ while running:
     # Проверка голов
     if not game_over and not ball.is_ready_to_launch:
         if ball.rect.right < 0:
+            ball_drop.play()
             score_right += 1
             if score_right >= 11:
                 game_over = True
+                falling_rackets.play()
             else:
                 ball.restart("right")
         elif ball.rect.left > WIDTH:
+            ball_drop.play()
             score_left += 1
             if score_left >= 11:
                 game_over = True
+                falling_rackets.play()
             else:
                 ball.restart("left")
 
