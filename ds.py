@@ -67,11 +67,11 @@ class Player(GameSprite):
         self.btnUp = btnUp
         self.btnDown = btnDown
 
-        self.is_bot = is_bot  # Новый флаг для определения бота
+        self.is_bot = is_bot  # Флаг для определения бота
         self.bot_reaction = 0.8  # Точность реакции бота (0.0-1.0)
 
-    def update(self, dy=0):
-        if dy!=0:
+    def update(self, dy=None):
+        if dy != None:
             self.rect.y += dy
             self.rect.y = max(0, min(self.rect.y, HEIGHT - PADDLE_HEIGHT))
         else:
@@ -118,11 +118,11 @@ class Ball(GameSprite):
     def __init__(self, fileImage=None, speedX=0, speedY=0, colores=WHITE):
         super().__init__(fileImage, w=BALL_SIZE, h=BALL_SIZE)
         self.is_ready_to_launch = True
-        self.launch_side = "left"
+        self.launch_side = "left" # Cторона запуска мяча
         self.dx = 0
         self.dy = 0
-        self.offset_y = 0  # Новый атрибут для смещения по Y
-        self.auto_launch_time = 0
+        self.offset_y = 0  # Атрибут для смещения по Y
+        self.auto_launch_time = 0 # 
         
     def restart(self, side):
         self.is_ready_to_launch = True
@@ -133,11 +133,11 @@ class Ball(GameSprite):
         # Добавляем автоматическое позиционирование только при сбросе
         if side == "right" and paddle_right.is_bot:
             paddle_right.auto_position_ball(self)  # Вызываем один раз при сбросе
-        
-        if side == "left":
-            self.rect.center = (paddle_left.rect.right + BALL_SIZE//2, paddle_left.rect.centery)
         else:
-            self.rect.center = (paddle_right.rect.left - BALL_SIZE//2, paddle_right.rect.centery)
+            if side == "left":
+                self.rect.center = (paddle_left.rect.right + BALL_SIZE//2, paddle_left.rect.centery)
+            else:
+                self.rect.center = (paddle_right.rect.left - BALL_SIZE//2, paddle_right.rect.centery)
 
     def move(self):
         if not self.is_ready_to_launch:
@@ -184,6 +184,7 @@ def show_menu():
 
     pygame.display.flip()
 
+game_mode=None
 menu=True
 while menu:
     show_menu()
@@ -206,7 +207,7 @@ if game_mode in [1, 2]:
     # Инициализация объектов
     paddle_left = Player(None, 10, RED, pygame.K_w, pygame.K_s ) #Левый игрок
     if game_mode == 1:
-        paddle_right = Player(None, WIDTH-PADDLE_WIDTH-10, BLUE, is_bot=True)
+        paddle_right = Player(None, WIDTH-PADDLE_WIDTH-10, BLUE, is_bot=True) #Правыый бот
     else:
         paddle_right = Player(None, WIDTH-PADDLE_WIDTH-10, BLUE, pygame.K_UP, pygame.K_DOWN) #Правый игрок
     
@@ -384,4 +385,3 @@ if game_mode in [1, 2]:
         # Обновление экрана
         pygame.display.flip()
         clock.tick(FPS)
-
