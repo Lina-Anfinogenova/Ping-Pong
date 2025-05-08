@@ -67,8 +67,14 @@ class Player(GameSprite):
         self.btnUp = btnUp
         self.btnDown = btnDown
 
+        # Настройки бота
         self.is_bot = is_bot  # Флаг для определения бота
         self.bot_reaction = 0.8  # Точность реакции бота (0.0-1.0)
+        self.bot_error_rate = 20 # Погрешность в предсказании координаты мяча
+        self.bot_dead_zone = 5 # Мертвая зона вокруг цели для предотвращения "дерганий" бота
+        self.bot_fast_speed_factor = 0.6 # Коэфициент к скорости бота для быстрого движения к цели (если бот еще далеко)
+        self.bot_slow_speed_factor = 0.3 # Коэфициент к скорости бота для медленного движения к цели (если бот близко к цели)
+        self.bot_speed_change_distance = 20 # Расстояние до цели смены коэфициеента скорости
 
     def update(self, dy=None):
         if dy != None:
@@ -88,25 +94,25 @@ class Player(GameSprite):
                 future_y = ball.rect.centery + ball.dy * time_to_impact
                 
                 # Добавляем случайную погрешность
-                future_y += random.randint(-20, 20) * (1 - self.bot_reaction)
+                future_y += random.randint(-self.bot_error_rate, self.bot_error_rate) * (1 - self.bot_reaction)
                 
                 # Плавное движение к цели
                 target_y = future_y - self.rect.height/2
                 target_y = max(0, min(target_y, HEIGHT - PADDLE_HEIGHT))
 
                 # Добавляем мертвую зону 5 пикселей
-                if abs(self.rect.centery - target_y) > 5:
-                    speed_factor = 0.6 if abs(self.rect.centery - target_y) > 20 else 0.3
+                if abs(self.rect.centery - target_y) > self.bot_dead_zone:
+                    speed_factor = self.bot_fast_speed_factor if abs(self.rect.centery - target_y) > self.bot_speed_change_distance else self.bot_slow_speed_factor
                     if self.rect.centery < target_y:
                         self.update(self.speed * speed_factor)
                     else:
                         self.update(-self.speed * speed_factor)
             else:
                 # Возвращаемся в центр, если мяч не летит к боту
-                if self.rect.centery < (HEIGHT//2) - 5:
-                    self.update(self.speed * 0.3)
-                elif self.rect.centery > (HEIGHT//2) + 5:
-                    self.update(-self.speed * 0.3)
+                if self.rect.centery < (HEIGHT//2) - self.bot_dead_zone:
+                    self.update(self.speed * self.bot_slow_speed_factor)
+                elif self.rect.centery > (HEIGHT//2) + self.bot_dead_zone:
+                    self.update(-self.speed * self.bot_slow_speed_factor)
         
     def auto_position_ball(self, ball):
         # Случайное смещение мяча для бота
@@ -122,13 +128,13 @@ class Ball(GameSprite):
         self.dx = 0
         self.dy = 0
         self.offset_y = 0  # Атрибут для смещения по Y
-        self.auto_launch_time = 0 # 
+        self.auto_launch_time = 0 # Случайная задержка для бота
         
     def restart(self, side):
         self.is_ready_to_launch = True
         self.launch_side = side
         self.offset_y = 0  # Сбрасываем смещение
-        self.auto_launch_time = pygame.time.get_ticks() + random.randint(1, 6)*500  # Задержка
+        self.auto_launch_time = pygame.time.get_ticks() + random.randint(1, 6)*500  # Случайная задержка для бота
 
         # Добавляем автоматическое позиционирование только при сбросе
         if side == "right" and paddle_right.is_bot:
@@ -206,6 +212,7 @@ while menu:
 if game_mode in [1, 2]:
     # Инициализация объектов
     paddle_left = Player(None, 10, RED, pygame.K_w, pygame.K_s ) #Левый игрок
+
     if game_mode == 1:
         paddle_right = Player(None, WIDTH-PADDLE_WIDTH-10, BLUE, is_bot=True) #Правыый бот
     else:
@@ -316,7 +323,7 @@ if game_mode in [1, 2]:
                     ball.offset_y = max(-PADDLE_HEIGHT//2 + BALL_SIZE, ball.offset_y - move_step)
                 if keys[pygame.K_d]:
                     ball.offset_y = min(PADDLE_HEIGHT//2 - BALL_SIZE, ball.offset_y + move_step)
-            else:
+            if ball.launch_side == "right" and not paddle_right.is_bot:
                 if keys[pygame.K_LEFT]:
                     ball.offset_y = max(-PADDLE_HEIGHT//2 + BALL_SIZE, ball.offset_y - move_step)
                 if keys[pygame.K_RIGHT]:
